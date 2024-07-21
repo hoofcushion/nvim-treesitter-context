@@ -12,24 +12,22 @@ local all_contexts = {}
 
 --- @generic F: function
 --- @param f F
---- @param ms? number
+--- @param ms_s? number
+--- @param ms_e? number
 --- @return F
-local function throttle(f, ms)
-  ms = ms or 200
+local function hold(f, ms_s, ms_e)
+  ms_s = ms_s or 200
+  ms_e = ms_e or math.floor(ms_s/2)
   local timer = assert(vim.loop.new_timer())
-  local waiting = 0
+  f = vim.schedule_wrap(f)
   return function()
-    if timer:is_active() then
-      waiting = waiting + 1
-      return
+    local is_active = timer:is_active()
+    if is_active then
+      timer:stop()
     end
-    waiting = 0
-    f() -- first call, execute immediately
-    timer:start(ms, 0, function()
-      if waiting > 1 then
-        vim.schedule(f) -- only execute if there are calls waiting
-      end
-    end)
+    local timeout = is_active and ms_s or ms_e
+    -- only respond the last call
+    timer:start(timeout, 0, f)
   end
 end
 
@@ -82,7 +80,7 @@ local function can_open(bufnr, winid)
   return true
 end
 
-local update = throttle(function()
+local update = hold(function()
   local bufnr = api.nvim_get_current_buf()
   local winid = api.nvim_get_current_win()
 
